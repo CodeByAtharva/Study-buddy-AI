@@ -15,6 +15,12 @@ let selectedRepositories = []; // Currently selected repositories
  * @param {string} text - Raw text response from AI
  * @returns {string} - Formatted HTML string
  */
+
+document.addEventListener('submit', function(e) {
+    e.preventDefault();
+});
+
+
 function formatAIResponse(text) {
     // Check if text contains a Sources section
     const sourcesMatch = text.match(/\*\*Sources:\*\*([\s\S]*?)$/);
@@ -510,18 +516,24 @@ document.addEventListener('DOMContentLoaded', function() {
         messageInput.disabled = selectedCount === 0;
         sendBtn.disabled = selectedCount === 0;
         
-        // Update chat view
+        // Update chat view — only touch the welcome message, never wipe existing chat
+        const hasMessages = chatMessages.querySelector('.message');
         if (selectedCount > 0) {
-            addWelcomeMessage();
+            // Only show welcome if there are no real messages yet
+            if (!hasMessages) {
+                addWelcomeMessage();
+            }
         } else {
-            clearChat();
-            chatMessages.innerHTML = `
-                <div class="welcome-message">
-                    <div class="welcome-icon">🤖</div>
-                    <h3 class="welcome-title">Welcome to RAGAI Chat!</h3>
-                    <p class="welcome-description">Select one or more repositories from the sidebar to start chatting with your documents.</p>
-                </div>
-            `;
+            // Only reset to the "no repo selected" welcome if there are no real messages
+            if (!hasMessages) {
+                chatMessages.innerHTML = `
+                    <div class="welcome-message">
+                        <div class="welcome-icon">🤖</div>
+                        <h3 class="welcome-title">Welcome to RAGAI Chat!</h3>
+                        <p class="welcome-description">Select one or more repositories from the sidebar to start chatting with your documents.</p>
+                    </div>
+                `;
+            }
         }
     }
 
@@ -600,6 +612,10 @@ document.addEventListener('DOMContentLoaded', function() {
      * Add welcome message when repositories are selected
      */
     function addWelcomeMessage() {
+        // Don't overwrite if real chat messages already exist
+        if (chatMessages.querySelector('.message')) {
+            return;
+        }
         const repoNames = selectedRepositories.map(r => r.repo_name).join(', ');
         const totalFiles = selectedRepositories.reduce((sum, r) => sum + (r.files ? r.files.length : 0), 0);
         
@@ -616,8 +632,9 @@ document.addEventListener('DOMContentLoaded', function() {
      * Add message to chat
      * @param {string} content - Message content
      * @param {string} sender - 'user' or 'assistant'
+     * @param {string} question - Original question (for saving)
      */
-    function addMessage(content, sender) {
+    function addMessage(content, sender, question = '') {
         // Remove welcome message if exists
         const welcomeMsg = chatMessages.querySelector('.welcome-message');
         if (welcomeMsg) {
@@ -653,6 +670,23 @@ document.addEventListener('DOMContentLoaded', function() {
         
         wrapper.appendChild(messageContent);
         wrapper.appendChild(messageTime);
+        
+        // Add save button for assistant messages
+        if (sender === 'assistant' && question) {
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-response-btn';
+            saveBtn.type = 'button'; // prevents form submit
+            saveBtn.innerHTML = '💾 Save Response';
+
+            saveBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                saveQueryWithButton(question, content, saveBtn);
+                return false;
+            });
+            wrapper.appendChild(saveBtn);
+        }
         
         messageDiv.appendChild(avatar);
         messageDiv.appendChild(wrapper);
@@ -762,9 +796,9 @@ document.addEventListener('DOMContentLoaded', function() {
             removeTypingIndicator();
 
             if (response.ok) {
-                // Add AI response to chat
+                // Add AI response to chat with question for saving
                 const aiResponse = data.response || 'I apologize, but I could not generate a response.';
-                addMessage(aiResponse, 'assistant');
+                addMessage(aiResponse, 'assistant', message);
                 
                 // Optionally log which repositories were used in the response
                 if (data.response_repo_names && data.response_repo_names.length > 0) {
@@ -807,6 +841,92 @@ document.addEventListener('DOMContentLoaded', function() {
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 150) + 'px';
     });
+
+    /**
+     * Save query and response with button feedback
+     * @param {string} question - The question asked
+     * @param {string} response - The AI response
+     * @param {HTMLElement} button - The save button element
+     */
+    async function saveQueryWithButton(question, response, button) {
+        console.log('Saving query...'); // Debug log
+        
+        // Get repository names
+        const repoNames = selectedRepositories.map(r => r.repo_name).join(', ');
+        
+        // Show loading state on button
+        button.disabled = true;
+        button.innerHTML = '⏳ Saving...';
+        
+        try {
+            const saveResponse = await fetch(`${API_BASE_URL}/saved-queries/save`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    question: question,
+                    response: response,
+                    repo_names: repoNames
+                })
+            });
+
+            console.log('Save response status:', saveResponse.status); // Debug log
+
+            if (saveResponse.ok) {
+                const data = await saveResponse.json();
+                console.log('Query saved:', data);
+                
+                // Update button to show success
+                button.innerHTML = '✅ Saved!';
+                button.style.background = 'rgba(34, 197, 94, 0.1)';
+                button.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                button.style.color = '#22c55e';
+                
+                // Keep the success state and don't allow re-saving
+                button.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+            } else {
+                const errorData = await saveResponse.json();
+                console.error('Failed to save query:', errorData);
+                
+                // Show error state on button
+                button.innerHTML = '❌ Failed';
+                button.disabled = false;
+                button.style.background = 'rgba(239, 68, 68, 0.1)';
+                button.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                button.style.color = '#ef4444';
+                
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    button.innerHTML = '💾 Save Response';
+                    button.style.background = '';
+                    button.style.borderColor = '';
+                    button.style.color = '';
+                }, 2000);
+            }
+        } catch (error) {
+            console.error('Error saving query:', error);
+            
+            // Show error state on button
+            button.innerHTML = '❌ Error';
+            button.disabled = false;
+            button.style.background = 'rgba(239, 68, 68, 0.1)';
+            button.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            button.style.color = '#ef4444';
+            
+            // Reset after 2 seconds
+            setTimeout(() => {
+                button.innerHTML = '💾 Save Response';
+                button.style.background = '';
+                button.style.borderColor = '';
+                button.style.color = '';
+            }, 2000);
+        }
+    }
 
     // Load repositories on page load
     loadRepositories();

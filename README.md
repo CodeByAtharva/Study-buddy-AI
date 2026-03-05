@@ -1,4 +1,4 @@
-# End-to-End RAG Application 🚀
+# Study Buddy AI Application 🚀
 
 An **End-to-End Retrieval-Augmented Generation (RAG) Application** that allows users to create repositories, upload documents, vectorize them, and chat with an AI model using the uploaded knowledge base.
 
@@ -17,6 +17,7 @@ This project demonstrates how to build a **production-ready RAG system** with ba
 - 🖥️ Interactive frontend UI
 - ⚡ FastAPI backend with SQLAlchemy
 - 🔑 Secure API key handling using environment variables
+- 
 
 ---
 
