@@ -3,7 +3,7 @@ from db.database import Base,engine
 from routers import login as login_router
 from routers import sign_up as sign_up_router
 from routers import repos as repos_router
-from routers import files as file_router
+from routers import Files as file_router
 from routers import chat as chat_router
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,7 +13,7 @@ app=FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # frontend origin
+    allow_origins=["http://localhost:3000","http://127.0.0.1:5500"],  # frontend origin
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
