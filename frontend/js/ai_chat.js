@@ -16,7 +16,34 @@ let selectedRepositories = []; // Currently selected repositories
  * @returns {string} - Formatted HTML string
  */
 function formatAIResponse(text) {
-    // Split into lines for processing
+    // Check if text contains a Sources section
+    const sourcesMatch = text.match(/\*\*Sources:\*\*([\s\S]*?)$/);
+    let mainContent = text;
+    let sourcesContent = '';
+    
+    if (sourcesMatch) {
+        // Separate main content and sources
+        mainContent = text.substring(0, sourcesMatch.index).trim();
+        sourcesContent = sourcesMatch[1].trim();
+    }
+    
+    // Format main content
+    let html = formatMainContent(mainContent);
+    
+    // Format sources section if present
+    if (sourcesContent) {
+        html += formatSources(sourcesContent);
+    }
+    
+    return html;
+}
+
+/**
+ * Format the main content (non-sources part)
+ * @param {string} text - Main content text
+ * @returns {string} - Formatted HTML
+ */
+function formatMainContent(text) {
     const lines = text.split('\n');
     let html = '';
     let inBulletList = false;
@@ -180,6 +207,32 @@ function formatAIResponse(text) {
     if (inNumberedList) {
         html += '</ol>';
     }
+    
+    return html;
+}
+
+/**
+ * Format sources section
+ * @param {string} sourcesText - Sources section text
+ * @returns {string} - Formatted HTML
+ */
+function formatSources(sourcesText) {
+    let html = '<div class="sources-section">';
+    html += '<div class="sources-heading">Sources</div>';
+    html += '<ul class="sources-list">';
+    
+    const lines = sourcesText.split('\n');
+    for (let line of lines) {
+        line = line.trim();
+        if (line.startsWith('-')) {
+            // Parse source line: - filename (Repository: repo): Page 1, Page 2
+            const sourceText = line.substring(1).trim();
+            html += `<li class="source-item">${formatInlineStyles(sourceText)}</li>`;
+        }
+    }
+    
+    html += '</ul>';
+    html += '</div>';
     
     return html;
 }
