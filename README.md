@@ -53,8 +53,8 @@ Screenshots :
 
 1️⃣ Clone the repository
 
-git clone https://github.com/Harsh-02-Bhalsing/end-to-end-rag-application.git
-cd end-to-end-rag-application
+git clone https://github.com/CodeByAtharva/Study-buddy-AI
+cd Study-buddy-AI
 
 2️⃣ Backend Setup
 
